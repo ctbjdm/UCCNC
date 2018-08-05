@@ -1,0 +1,363 @@
+// Auto Z and Corner Finding Touch Plate Script for UCCNC
+// by Josh Molaver
+// based on CNC Router Parts original three axis script written for Mach3 in VB
+// also heavily based on RobertSpark's three axis script as published in CNCZone for UCCNC
+
+// Version history
+// 1.00 - tested successfully using all four probe locations
+
+double touchplateheight;
+double probefeedrate;
+double xprobedistance;
+double yprobedistance;
+double zprobedistance;
+double touchplatewidth;
+double xprobedirection = 1;
+double yprobedirection = 1;
+double tooldiameter;
+double wcsorigin;
+double safez;
+double xyprobeheight;
+double tempval;
+bool probex;
+bool probey;
+bool probez;
+bool pauseprobe;
+bool debugmode;
+string resulttext;
+// below from Ger's macro
+
+bool XRef = AS3.Getbuttonstate(107); // Check if X axis has been homed
+bool YRef = AS3.Getbuttonstate(108); // Check if Y axis has been homed
+bool ZRef = AS3.Getbuttonstate(109); // Check if Z axis has been home
+
+double Xmachine = AS3.Getfielddouble(871); // Current X axis machine coordinate
+double Ymachine = AS3.Getfielddouble(872); // Current Y axis machine coordinate
+double Zmachine = AS3.Getfielddouble(873); // Current Z axis machine coordinate
+
+
+	debugmode = true;			// Debug Mode - true enables Debug, set to false for normal use once this is working
+
+	pauseprobe = true;			// true = Prompt user to rotate tool before X and Y axis probing
+	wcsorigin = 0;				// Default Corner for the probe -- 0=Left/Front 1=Left/Rear 2=Right/Front 3=Right/Rear
+	
+	probex = false; 				// By default, do not probe/zero X (change this to true to change the default)
+	probey = false; 				// By default, do not probe/zero Y (change this to true to change the default)
+	probez = true;				// by default probe Z
+
+	probefeedrate = 100; 			// 
+
+	touchplateheight = 25.4;		// CRP Touchplate is 1" nominal, can adjust this number to calibrate (usually not required)
+	touchplatewidth = (2.205 * 25.4); 	// Width of Touchplate is 2.205" (56mm) wide
+	xprobedistance = 2 * 25.4;		// How long to probe X Axis 
+	yprobedistance = 2 * 25.4;		// How long to probe Y Axis 
+	zprobedistance = 1.5 * 25.4;		// How long to probe Z Axis
+
+	safez = 20.0; 				// enter your Safe Z distance.  After probing it lifts up probe height + this value
+
+	xyprobeheight = touchplateheight + (.125 * 25.4); 			// How high to lift tool while probing X and Y.  Using the touchplateheight + 1/8" (converted to mm)
+
+
+	if (debugmode) {
+		exec.TextQuestion ("DEBUG - Starting");
+	}
+// do some checks
+
+	if (!XRef || !YRef)
+		{
+		MessageBox.Show (exec.mainform, "X and/or Y axes have not yet been referenced." + "\n" + "Home X & Y axis before attempting to zero tool.", "X and Y Axes not Referenced!!!", MessageBoxButtons.OK, MessageBoxIcon.Error);
+		exec.AddStatusmessage("Macro aborted - Axes not Referenced");
+		exec.Stop();
+		return;
+		}
+		
+	if (!ZRef)
+		{
+		MessageBox.Show (exec.mainform, "Z axis has not yet been referenced." + "\n" + "Home Z axis before attempting to zero tool.", "Z Axis not Referenced!!!", MessageBoxButtons.OK, MessageBoxIcon.Error);
+		exec.AddStatusmessage("Macro aborted - Axis not Referenced");
+		exec.Stop();
+		return;
+		}
+
+	// Check Probe Input - if already active then abort
+	if (AS3.GetLED(37)) 
+		{
+		MessageBox.Show (exec.mainform, "Probe Input is currently active." + "\n" + "Check connections and try again.", "Probe Active!!!", MessageBoxButtons.OK, MessageBoxIcon.Error);
+		exec.AddStatusmessage("Macro aborted - Probe Active");
+		exec.Stop();
+		return;
+		}
+
+
+
+	tooldiameter = exec.Question("Enter tool diameter in inches");
+	
+	// JDM converting tool diameter to mm since I'm with most of the world's population, but my bits are imperial.  Probably add better logic in here for unit conversions / options
+	tooldiameter = tooldiameter * 25.4;
+
+
+	// select axes to auto zero
+
+	resulttext = exec.TextQuestion("Which Axes to auto zero?  Enter X|Y|Z or multiple i.e. XY").ToUpper();
+	
+	if (resulttext.Contains("X")) {
+		probex = true;
+	}
+	else {
+		probex = false;
+	}
+
+	if (resulttext.Contains("Y")) {
+		probey = true;
+	}
+	else {
+		probey = false;
+	}
+
+
+	if (resulttext.Contains("Z")) {
+		probez = true;
+	}
+	else {
+		probez = false;
+	}
+
+	if (debugmode) {
+		exec.TextQuestion("probex: " + probex.ToString() + " probey: " + probey.ToString() + " probez: " + probez.ToString());
+	}
+
+	if (! probex && ! probey && ! probez) {
+		exec.TextQuestion("Must choose at least one axes to probe on...aborting");
+		Console.Beep();
+  		exec.Stop();
+  		return;
+	}
+
+
+	// only ask the user where the probe is if they are probing X or Y-Axis
+	if (probex || probey) {
+	// Identify where the probe is
+	// 0=Left/Front 1=Left/Rear 2=Right/Front 3=Right/Rear
+
+		wcsorigin = exec.Question("Where is the probe? 0=Left/Front 1=Left/Rear 2=Right/Front 3=Right/Rear?  Default is 0");
+		if ((wcsorigin < 0) || (wcsorigin > 3)) {
+			// error - convert to try/catch?
+			exec.TextQuestion("Invalid entry; Enter 0, 1, 2, or 3");
+			Console.Beep();
+		}
+
+		// setup variables based on where probe was selected
+
+		  switch ((int)wcsorigin) {
+			case 0:
+			xprobedirection = 1;
+			yprobedirection = 1;
+			break;
+
+			case 1:
+				xprobedirection = 1;
+				yprobedirection = -1;
+				break;
+
+			case 2:
+				xprobedirection = -1;
+				yprobedirection = 1;
+				break;
+
+			case 3:
+				xprobedirection = -1;
+				yprobedirection = -1;
+				break;	
+				
+			default:
+				xprobedirection = 1;
+				yprobedirection = 1;
+				break;	
+		  } // switch
+
+
+		if (debugmode) {
+			exec.TextQuestion("xprobedirection: " + xprobedirection.ToString() + " yprobedirection: " + yprobedirection.ToString());
+		}
+	}
+
+
+
+
+
+	if (probez) {
+		tempval = (zprobedistance*-1);
+		exec.Code("G31 Z" + tempval.ToString() + " F" + probefeedrate.ToString()); // Do the Z probing with Probe Feedrate.  JDM I changed the + to a minus to bring G31 down by zprobedistance - that right?  if Z moves up instead of down check this
+		while(exec.IsMoving()){}
+  		exec.Wait(100);
+  		Console.Beep();
+  
+		// touch plate thickness / height Correction
+	    exec.Code("G92 Z" + touchplateheight.ToString()); 
+
+		// now retract Z, if probing X or Y then only retract to xyprobeheight - otherwise retract to safez + touchplateheight
+  		
+		if (probex || probey) {
+			exec.Code("G00 Z" + (xyprobeheight)); 
+		}
+		else {
+			tempval = (safez + touchplateheight);
+			exec.Code("G00 Z" + tempval.ToString());
+		}
+		
+  		while(exec.IsMoving()){}
+  		exec.Wait(100); 
+  }
+
+	
+	if (probex) {		
+		if (pauseprobe) {
+			exec.TextQuestion("Align Tool Flutes for X-Axis Travel and Press OK");
+		}
+
+  
+		// save off XMachine coordinates to be able to move back to original location
+//		Xmachine = AS3.Getfielddouble((97); // Current X axis machine coordinate
+
+// change this to G0 when ready to go
+		exec.Code("G01 Z" + xyprobeheight); // Lower Z axis to X and Y probe plane
+  		while(exec.IsMoving()){}
+  		exec.Wait(100);
+		Xmachine = AS3.Getfielddouble(97);
+		
+		if (debugmode) {
+			exec.TextQuestion("Xmachine = " + Xmachine);
+			exec.TextQuestion("xprobedistance = " + xprobedistance);
+			exec.TextQuestion("probing to " + (double)(Xmachine + (xprobedistance * xprobedirection)));
+		}	
+		tempval = (Xmachine + (xprobedistance * xprobedirection));
+  		exec.Code("G31 X" + tempval.ToString() + " F" + probefeedrate); // Do the X probing with Probe Feedrate.  JDM added the * xprobedirection to enable touchplate locations
+  		while(exec.IsMoving()){}
+  		exec.Wait(100);
+  		Console.Beep();
+		
+  		if (debugmode) {
+			exec.TextQuestion("finished running G31");
+			exec.TextQuestion("Touchplatewidth = " + touchplatewidth + " toolradius = " + (tooldiameter/2) + " xprobedirection = " + xprobedirection + " so setting X0 to " + (touchplatewidth - (tooldiameter/2)) * xprobedirection);
+			exec.TextQuestion("setting G92 to " + (double)((touchplatewidth - (tooldiameter/2)) * xprobedirection));
+			}
+			tempval = (double)((touchplatewidth - (tooldiameter/2)) * xprobedirection);
+		exec.Code("G92 X" + tempval.ToString()); // Zero the X-axis
+		
+//		XMachine =  AS3.Getfielddouble(871) - XMachine; // calculate how far in the X direction you moved so you can move back
+
+// change this to G0 when ready to go
+		tempval = ((touchplatewidth/2) - (tooldiameter/2)) * xprobedirection;
+  		exec.Code("G01 X" + tempval.ToString()); // Safe X retract; JDM added the * xprobedirection to enable touchplate locations
+  		while(exec.IsMoving()){}
+  		exec.Wait(100);
+
+
+	} // if probex
+
+
+ 	if (probey) {
+		if (pauseprobe) {
+			exec.TextQuestion("Align Tool Flutes for Y-Axis Travel and Press OK");
+		}
+
+
+// change this to G0 when ready to go
+		exec.Code("G01 Z" + xyprobeheight); // Lower Z axis to X and Y probe plane
+  		while(exec.IsMoving()){}
+  		exec.Wait(100);
+		Ymachine = AS3.Getfielddouble(98);
+		
+		if (debugmode) {
+			exec.TextQuestion("Ymachine = " + Ymachine);
+			exec.TextQuestion("yprobedistance = " + yprobedistance);
+			exec.TextQuestion("probing to " + (double)(Ymachine + (yprobedistance * yprobedirection)));
+		}	
+		tempval = (Ymachine + (yprobedistance * yprobedirection));
+  		exec.Code("G31 Y" + tempval.ToString() + " F" + probefeedrate); // Do the Y probing with Probe Feedrate.  JDM added the * xprobedirection to enable touchplate locations
+  		while(exec.IsMoving()){}
+  		exec.Wait(100);
+  		Console.Beep();
+		
+  		if (debugmode) {
+			exec.TextQuestion("finished running G31");
+			exec.TextQuestion("Touchplatewidth = " + touchplatewidth + " toolradius = " + (tooldiameter/2) + " yprobedirection = " + yprobedirection + " so setting Y0 to " + (touchplatewidth - (tooldiameter/2)) * yprobedirection);
+			exec.TextQuestion("setting G92 to " + (double)((touchplatewidth - (tooldiameter/2)) * yprobedirection));
+			}
+		tempval = ((touchplatewidth - (tooldiameter/2)) * yprobedirection);
+		exec.Code("G92 Y" + tempval.ToString()); // Zero the Y-axis
+		
+//		XMachine =  AS3.Getfielddouble(871) - XMachine; // calculate how far in the X direction you moved so you can move back
+
+// change this to G0 when ready to go
+		tempval = ((touchplatewidth/2) - (tooldiameter/2)) * yprobedirection;
+  		exec.Code("G01 Y" + tempval.ToString()); // Safe X retract; JDM added the * xprobedirection to enable touchplate locations
+  		while(exec.IsMoving()){}
+  		exec.Wait(100);
+
+  
+/* why safe Z retract?
+  		exec.Code("G00 Z" + safez); // Safe Z retract
+  		while(exec.IsMoving()){}
+  		exec.Wait(100);
+
+*/
+
+	} // if probey
+
+/* why would you want to do this?
+  exec.Code("G00 X0 Y0"); // Move to 0,0 at Safe Z, which should be the top RHS tip of the block.
+  while(exec.IsMoving()){}
+  exec.Wait(100);
+  
+*/
+
+
+// now adjust for tool diameter
+
+/* 
+	if (probex) {
+		exec.Code("G92 X" + (tooldiameter / 2).ToString());
+	}
+
+	if (probey) {
+		exec.Code("G92 Y" + (tooldiameter / 2).ToString());
+	} */
+
+/* 	// Now move to a safez
+  	exec.Code("G00 Z" + safez); // Safe Z retract
+  	while(exec.IsMoving()){}
+  	exec.Wait(100); */
+  
+/*
+  exec.Code("G00 X0 Y0"); // Move to 0,0 at Safe Z, which should be the top RHS tip of the block.
+  while(exec.IsMoving()){}
+  exec.Wait(100);
+    
+*/
+
+
+  Console.Beep();
+  Console.Beep();
+
+
+
+
+
+/*
+
+		YNew = YCurrent + (yprobedistance * yprobedirection) // probe vector
+		Code "G31 Y" &YNew
+		While IsMoving() // wait for the move to finish
+		Wend
+		SetDro(1,(touchplatewidth-ToolRad)*yprobedirection)
+		
+		if yprobedirection = 1 Then
+			Code "G0 Y" &(touchplatewidth/2)-ToolRad // Center the tool on touch plate
+		Else
+			Code "G0 Y" &((touchplatewidth/2)-ToolRad)*-1 // Center the tool on touch plate
+		End if 	
+	End If
+
+
+*/
