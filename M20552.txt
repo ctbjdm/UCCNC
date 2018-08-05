@@ -1,0 +1,26 @@
+// Go to Zero with SafeZ 2
+
+if(exec.GetXpos()==0 && exec.GetYpos()==0 && exec.GetZpos()==0 && exec.GetApos()==0 && exec.GetBpos()==0 && exec.GetCpos()==0)
+	{
+	return; // if all position DROs are already zero then return
+	}
+
+double SafeZ = AS3.Getfielddouble(20304); // Get  Safe Z
+int originaldistancemode = exec.actualdistmode; // remember the distance mode
+int originalmodalmode = exec.actualmodal; // remember the modal mode
+
+
+exec.Code("G90"); // Change to Absolute Mode
+while(exec.IsMoving()){}
+
+/* exec.Code("G53 G00 Z"+ SafeZ); // Move Z up to safeZ defined by user, above the zero plane
+while(exec.IsMoving()){} */
+
+exec.Code("G00 X0 Y0 A0"); // Move XYA to Zero
+while(exec.IsMoving()){}
+
+exec.Code("G00 Z0"); // Move Z to 0
+while(exec.IsMoving()){}
+
+exec.Code("G" + originaldistancemode); // Set system back to the original distance mode
+exec.Code("G" + originalmodalmode); // Set system back to the original modal mode
