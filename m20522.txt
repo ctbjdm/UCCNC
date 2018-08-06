@@ -11,6 +11,7 @@
 
 // KNOWN ISSUES OR IMPROVEMENTS
 // - what to do if probe edge isn't reached
+// retract distance from probing X and Y is going too far, should center on probe plate.  Guessing maybe not accounting for bit diameter/radius (looks like radius)
 
 
 // NOTES ON UNITS -   I haven't incorporated logic to ask you if you're working in imperial or metric.  I work in metric, but my bits are measured in imperial.  Right now I'm converting that to metric
@@ -18,7 +19,7 @@
 
 // Variables you probably care about and should review are here
 
-bool DebugMode = true;									// Debug Mode - true enables Debug mode (lots of prompts/details presented for troubleshooting, and movements are slowed down)
+bool DebugMode = false;									// Debug Mode - true enables Debug mode (lots of prompts/details presented for troubleshooting, and movements are slowed down)
 														// 			set to false for normal use once this is working
 														
 bool PauseProbe = true;									// Pause probing between probing X and Y axis to align the bit?  true = pauses, false does not
@@ -59,14 +60,14 @@ double TempDouble;										// temporary variable to do math outside of GCode st
 
 	//  During debugging using G01 instead of G00 to slow things down for testing
 	if (DebugMode) {
-		G0String = "G00"
+		G0String = "G01";
 	}
 	else {
-		G0String = "G01"
+		G0String = "G00";
 	}
 
 	if (DebugMode) {
-		MessageBox.Show (exec.mainform, "Starting", "DEBUG", MessageBoxButtons.OK, MessageBoxIcon.Error);
+		MessageBox.Show (exec.mainform, "Starting", "DEBUG", MessageBoxButtons.OK, MessageBoxIcon.Information);
 	}
 // do some checks
 
@@ -95,7 +96,6 @@ double TempDouble;										// temporary variable to do math outside of GCode st
 		return;
 		}
 
-	ToolDiameter = exec.Question("Enter tool diameter in inches");
 	
 	// JDM converting tool diameter to mm since I'm with most of the world's population, but my bits are imperial.  Probably add better logic in here for unit conversions / options
 	ToolDiameter = ToolDiameter * 25.4;
@@ -126,7 +126,7 @@ double TempDouble;										// temporary variable to do math outside of GCode st
 	}
 
 	if (DebugMode) {
-		MessageBox.Show (exec.mainform, "ProbeX: " + ProbeX + " ProbeY: " + ProbeY + " ProbeZ: " + ProbeZ", "DEBUG - Probe Values", MessageBoxButtons.OK, MessageBoxIcon.Information);
+		MessageBox.Show (exec.mainform, "ProbeX: " + ProbeX + " ProbeY: " + ProbeY + " ProbeZ: " + ProbeZ, "DEBUG - Probe Values", MessageBoxButtons.OK, MessageBoxIcon.Information);
 	}
 
 	if (! ProbeX && ! ProbeY && ! ProbeZ) {
@@ -136,9 +136,11 @@ double TempDouble;										// temporary variable to do math outside of GCode st
 		return; 
 	}
 
-	// only ask the user where the probe is if they are probing X or Y-Axis
+	// only ask the user about tthe tool diameter and where the probe is if they are probing X or Y-Axis
 	if (ProbeX || ProbeY) {
 	
+		ToolDiameter = exec.Question("Enter tool diameter in inches");
+
 		// Identify where the probe is
 		// 0=Left/Front 1=Left/Rear 2=Right/Front 3=Right/Rear
 		WCSOrigin = exec.Question("Where is the probe? 0=Left/Front 1=Left/Rear 2=Right/Front 3=Right/Rear?  Default is 0");
@@ -212,7 +214,7 @@ double TempDouble;										// temporary variable to do math outside of GCode st
 	
 	if (ProbeX) {		
 		if (PauseProbe) {
-			MessageBox.Show (exec.mainform, "Align Tool Flutes for X-Axis Travel and Press OK", "Align Flutes", "MessageBoxButtons.OK, MessageBoxIcon.Hand);
+			MessageBox.Show (exec.mainform, "Align Tool Flutes for X-Axis Travel and Press OK", "Align Flutes", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 
 		// Lower Z axis to X and Y probe plane
@@ -224,7 +226,7 @@ double TempDouble;										// temporary variable to do math outside of GCode st
 		XMachineCoord = AS3.Getfielddouble(97);
 		
 		if (DebugMode) {
-			MessageBox.Show (exec.mainform, "XMachineCoord = " + XMachineCoord" + "\n" + "XProbeDistance = " + XProbeDistance" + "\n" + "probing to " + (double)(XMachineCoord + (XProbeDistance * XProbeDirection)), "Probing debug info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+			MessageBox.Show (exec.mainform, "XMachineCoord = " + XMachineCoord + "\n" + "XProbeDistance = " + XProbeDistance + "\n" + "probing to " + (XMachineCoord + (XProbeDistance * XProbeDirection)), "Probing debug info", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 		
 		TempDouble = (XMachineCoord + (XProbeDistance * XProbeDirection));
@@ -234,7 +236,7 @@ double TempDouble;										// temporary variable to do math outside of GCode st
   		Console.Beep();
 		
   		if (DebugMode) {
-			MessageBox.Show (exec.mainform, "finished running G31 for X axis." + "\n" + "TouchPlateWidth = " + TouchPlateWidth + " toolradius = " + (ToolDiameter/2) + " XProbeDirection = " + XProbeDirection + " so setting X0 to " + (double)((TouchPlateWidth - (ToolDiameter/2)) * XProbeDirection).ToString(), "DEBUG info", "MessageBoxButtons.OK, MessageBoxIcon.Information);
+			MessageBox.Show (exec.mainform, "finished running G31 for X axis" + "\n" + "TouchPlateWidth = " + TouchPlateWidth + " toolradius = " + (ToolDiameter/2) + " XProbeDirection = " + XProbeDirection + " so setting X0 to " + ((TouchPlateWidth - (ToolDiameter/2)) * XProbeDirection), "DEBUG info", MessageBoxButtons.OK, MessageBoxIcon.Information);
 			}
 		
 		// Zero the X-axis
@@ -253,7 +255,7 @@ double TempDouble;										// temporary variable to do math outside of GCode st
 
  	if (ProbeY) {
 		if (PauseProbe) {
-			MessageBox.Show (exec.mainform, "Align Tool Flutes for Y-Axis Travel and Press OK", "Align Flutes", "MessageBoxButtons.OK, MessageBoxIcon.Hand);
+			MessageBox.Show (exec.mainform, "Align Tool Flutes for Y-Axis Travel and Press OK", "Align Flutes", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 
 		// Lower Z axis to X and Y probe plane
@@ -265,7 +267,7 @@ double TempDouble;										// temporary variable to do math outside of GCode st
 		YMachineCoord = AS3.Getfielddouble(98);
 		
 		if (DebugMode) {
-			MessageBox.Show (exec.mainform, "YMachineCoord = " + YMachineCoord" + "\n" + "YProbeDistance = " + YProbeDistance" + "\n" + "probing to " + (double)(YMachineCoord + (YProbeDistance * YProbeDirection)), "Probing debug info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+			MessageBox.Show (exec.mainform, "YMachineCoord = " + YMachineCoord + "\n" + "YProbeDistance = " + YProbeDistance + "\n" + "probing to " + (YMachineCoord + (YProbeDistance * YProbeDirection)), "Probing debug info", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}	
 		
 		// Do the Y probing with Probe Feedrate.
@@ -276,7 +278,7 @@ double TempDouble;										// temporary variable to do math outside of GCode st
   		Console.Beep();
 		
   		if (DebugMode) {
-			MessageBox.Show (exec.mainform, "finished running G31 for Y axis." + "\n" + "TouchPlateWidth = " + TouchPlateWidth + " toolradius = " + (ToolDiameter/2) + " YProbeDirection = " + YProbeDirection + " so setting Y0 to " + (double)((TouchPlateWidth - (ToolDiameter/2)) * YProbeDirection).ToString(), "DEBUG info", "MessageBoxButtons.OK, MessageBoxIcon.Information);
+			MessageBox.Show (exec.mainform, "finished running G31 for Y axis." + "\n" + "TouchPlateWidth = " + TouchPlateWidth + " toolradius = " + (ToolDiameter/2) + " YProbeDirection = " + YProbeDirection + " so setting Y0 to " + ((TouchPlateWidth - (ToolDiameter/2)) * YProbeDirection), "DEBUG info", MessageBoxButtons.OK, MessageBoxIcon.Information);
 			}
 		
 		// Zero the Y-axis
