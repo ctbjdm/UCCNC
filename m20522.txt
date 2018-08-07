@@ -14,8 +14,8 @@
 // retract distance from probing X and Y is going too far, should center on probe plate.  Guessing maybe not accounting for bit diameter/radius (looks like radius)
 
 
-// NOTES ON UNITS -   I haven't incorporated logic to ask you if you're working in imperial or metric.  I work in metric, but my bits are measured in imperial.  Right now I'm converting that to metric
-// you should review this code carefully to make sure you don't break anything!
+// NOTES ON UNITS -   I haven't incorporated logic to ask you if you're working in imperial or metric.  I work in metric, but my bits are measured in imperial.  Right now I'm converting that to metric but
+// you should review this code carefully to make sure you don't break anything and use debug mode.
 
 // Variables you probably care about and should review are here
 
@@ -24,8 +24,10 @@ bool DebugMode = false;									// Debug Mode - true enables Debug mode (lots of
 														
 bool PauseProbe = true;									// Pause probing between probing X and Y axis to align the bit?  true = pauses, false does not
 	
+bool BitDiameterInInches = true;						//  Ask the user for bit diameter in inches.  Is there a better way to handle metric vs imperial?
+	
 double ProbeFeedRate = 100; 							// feedrate that all probing is done.  
-double TouchPlateHeight = 25.4;							// CNC RouterParts Touchplate is 1" wide
+double TouchPlateHeight = 25.4;							// CNC RouterParts Touchplate is 1" high
 double TouchPlateWidth = (2.205 * 25.4); 				// Width of CNC RouterParts Touchplate is 2.205" (56mm) wide
 double XProbeDistance = 2 * 25.4;						// How far to probe X Axis looking for the edge
 double YProbeDistance = 2 * 25.4;						// How far to probe Y Axis looking for the edge
@@ -33,10 +35,10 @@ double ZProbeDistance = 1.5 * 25.4;						// How far to probe Z Axis looking for 
 double SafeZ = 20; 										// enter your Safe Z distance.  After probing it lifts up probe height + this value
 double XYProbeHeight = TouchPlateHeight+(.125*25.4); 	// How high to lift tool while probing X and Y.  I'm using the TouchPlateHeight + 1/8" (converted to mm)
 
-// Remaining variables you probably don't need to change unless you know what you;'re doing
+// Remaining variables you probably don't need to change unless you know what you're doing
 
-string ResultText;										// string to capture user input in Questions
-string G0String; 										// variable for G00 or G01.  I wanted a way to use G01 while debugging, but use G00 for run mode.  
+string ResultText = "";										// string to capture user input in Questions
+string G0String = ""; 										// variable for G00 or G01.  I wanted a way to use G01 while debugging, but use G00 for run mode.  
 														// so I use this to insert G01 to move at feedrate speeds (slow things down for troubleshooting) and in run mode use G00 for rapid movements
 														// I set this early on, checking if in debug mode or not.
 													
@@ -53,8 +55,8 @@ double ZMachineCoord = AS3.Getfielddouble(873); 		// Current Z axis machine coor
 double WCSOrigin = 0;									// Used to determine where the 3 axis probe is located on the work piece.  0=Left/Front 1=Left/Rear 2=Right/Front 3=Right/Rear
 double XProbeDirection = 1;								// When user selects where the probe is, this will determine which way to probe for the edge (it's either 1 or -1)
 double YProbeDirection = 1;								// When user selects where the probe is, this will determine which way to probe for the edge (it's either 1 or -1)
-double ToolDiameter;									// store the tool's diameter from user input.  Note that you should review this script for units to make sure it works for you
-double TempDouble;										// temporary variable to do math outside of GCode string values.  
+double ToolDiameter = 0									// store the tool's diameter from user input.  Note that you should review this script for units to make sure it works for you
+double TempDouble = 0;										// temporary variable to do math outside of GCode string values.  
 
 
 
@@ -96,12 +98,7 @@ double TempDouble;										// temporary variable to do math outside of GCode st
 		return;
 		}
 
-	
-	// JDM converting tool diameter to mm since I'm with most of the world's population, but my bits are imperial.  Probably add better logic in here for unit conversions / options
-	ToolDiameter = ToolDiameter * 25.4;
-
 	// select axes to auto zero
-
 	ResultText = exec.TextQuestion("Which Axes to auto zero?  Enter X|Y|Z or multiple i.e. XY").ToUpper();
 	
 	if (ResultText.Contains("X")) {
@@ -138,9 +135,19 @@ double TempDouble;										// temporary variable to do math outside of GCode st
 
 	// only ask the user about tthe tool diameter and where the probe is if they are probing X or Y-Axis
 	if (ProbeX || ProbeY) {
-	
-		ToolDiameter = exec.Question("Enter tool diameter in inches");
+		
+		// since probing X or Y, need the tool diameter so ask the user for the bit diameter (not needed if only probing Z)
 
+		// check for Imperial or metric for the bit diameter, as set by the BitDiameterInInches boolean at the top and handle the conversion if necessary
+		if (BitDiameterInInches) {
+			ToolDiameter = exec.Question("Enter tool diameter in inches");
+			// JDM converting tool diameter to mm since I'm with most of the world's population in working in metric, but my bits are imperial. 
+			ToolDiameter = ToolDiameter * 25.4;
+		}
+		else {
+			ToolDiameter = exec.Question("Enter tool diameter in mm");;		
+		}
+		
 		// Identify where the probe is
 		// 0=Left/Front 1=Left/Rear 2=Right/Front 3=Right/Rear
 		WCSOrigin = exec.Question("Where is the probe? 0=Left/Front 1=Left/Rear 2=Right/Front 3=Right/Rear?  Default is 0");
@@ -198,26 +205,22 @@ double TempDouble;										// temporary variable to do math outside of GCode st
 		// touch plate thickness / height Correction
 	    exec.Code("G92 Z" + TouchPlateHeight); 
 
-		// now retract Z, if probing X or Y then only retract to XYProbeHeight - otherwise retract to SafeZ + TouchPlateHeight
+		// now retract Z, if probing X or Y then only retract to XYProbeHeight .  Otherwise the end of this code will bring it back to the final SafeZ height
 		if (ProbeX || ProbeY) {
 			exec.Code(G0String + " Z" + XYProbeHeight); 
-		}
-		else {
-			TempDouble = (SafeZ + TouchPlateHeight);
-			exec.Code(G0String + " Z" + TempDouble);
 		}
 		
   		while(exec.IsMoving()){}
   		exec.Wait(100); 
   }
 
-	
+  
 	if (ProbeX) {		
 		if (PauseProbe) {
 			MessageBox.Show (exec.mainform, "Align Tool Flutes for X-Axis Travel and Press OK", "Align Flutes", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 
-		// Lower Z axis to X and Y probe plane
+		// Lower Z axis to X and Y probe height
 		exec.Code(G0String + " Z" + XYProbeHeight); 
   		while(exec.IsMoving()){}
   		exec.Wait(100);
@@ -258,7 +261,7 @@ double TempDouble;										// temporary variable to do math outside of GCode st
 			MessageBox.Show (exec.mainform, "Align Tool Flutes for Y-Axis Travel and Press OK", "Align Flutes", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 
-		// Lower Z axis to X and Y probe plane
+		// Lower Z axis to X and Y probe height
 		exec.Code(G0String + " Z" + XYProbeHeight); 
   		while(exec.IsMoving()){}
   		exec.Wait(100);
@@ -293,8 +296,15 @@ double TempDouble;										// temporary variable to do math outside of GCode st
 
 	} // if ProbeY
 
-  Console.Beep();
-  Console.Beep();
+	
+	// retract Z to SafeZ height plus the TouchPlateHeight
+	TempDouble = (SafeZ + TouchPlateHeight);
+	exec.Code(G0String + " Z" + TempDouble);
+	while(exec.IsMoving()){}
+	exec.Wait(100); 
+	
+	Console.Beep();
+	Console.Beep();
 
 
 
