@@ -416,7 +416,7 @@ Viewerrapidpathcolor=16711680
 ViewerTCPmarkercolor=16776960
 ViewerBackgroundcolor=0
 Viewerboundariescolor=16777215
-GVgcodecolors=16777215
+GVgcodecolors=-16777216
 GVmcodecolors=-233
 GVscodecolors=-32513
 GVfcodecolors=-21931
@@ -552,9 +552,9 @@ TooloffsetZ94=0
 TooloffsetZ95=0
 TooloffsetZ96=0
 [Workoffset_G54]
-WorkoffsetX=0
-WorkoffsetY=0
-WorkoffsetZ=-130.455
+WorkoffsetX=13.375
+WorkoffsetY=33.2875
+WorkoffsetZ=-148.195
 WorkoffsetA=0
 WorkoffsetB=0
 WorkoffsetC=0
@@ -594,9 +594,9 @@ WorkoffsetA=0
 WorkoffsetB=0
 WorkoffsetC=0
 [Machinecoords]
-MachinecoordsX=186.1625
-MachinecoordsY=672.8625
-MachinecoordsZ=-28.725
+MachinecoordsX=23.075
+MachinecoordsY=96.2375
+MachinecoordsZ=-134.45
 MachinecoordsA=0
 MachinecoordsB=0
 MachinecoordsC=0
@@ -1904,3 +1904,6 @@ UCdevicetype=UC300ETH_5LPT
 [2017JogSpeeds]
 913=5
 2027=0.01
+[RFHsettings]
+Switchspindlemode=1
+Doinitialmoveswithrapid=False
