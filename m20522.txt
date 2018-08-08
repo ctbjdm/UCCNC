@@ -37,8 +37,8 @@ double XYProbeHeight = TouchPlateHeight+(.125*25.4); 	// How high to lift tool w
 
 // Remaining variables you probably don't need to change unless you know what you're doing
 
-string ResultText = "";										// string to capture user input in Questions
-string G0String = ""; 										// variable for G00 or G01.  I wanted a way to use G01 while debugging, but use G00 for run mode.  
+string ResultText = "";									// string to capture user input in Questions
+string G0String = ""; 									// variable for G00 or G01.  I wanted a way to use G01 while debugging, but use G00 for run mode.  
 														// so I use this to insert G01 to move at feedrate speeds (slow things down for troubleshooting) and in run mode use G00 for rapid movements
 														// I set this early on, checking if in debug mode or not.
 													
@@ -55,8 +55,8 @@ double ZMachineCoord = AS3.Getfielddouble(873); 		// Current Z axis machine coor
 double WCSOrigin = 0;									// Used to determine where the 3 axis probe is located on the work piece.  0=Left/Front 1=Left/Rear 2=Right/Front 3=Right/Rear
 double XProbeDirection = 1;								// When user selects where the probe is, this will determine which way to probe for the edge (it's either 1 or -1)
 double YProbeDirection = 1;								// When user selects where the probe is, this will determine which way to probe for the edge (it's either 1 or -1)
-double ToolDiameter = 0									// store the tool's diameter from user input.  Note that you should review this script for units to make sure it works for you
-double TempDouble = 0;										// temporary variable to do math outside of GCode string values.  
+double ToolDiameter = 0;								// store the tool's diameter from user input.  Note that you should review this script for units to make sure it works for you
+double TempDouble = 0;									// temporary variable to do math outside of GCode string values.  
 
 
 
