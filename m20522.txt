@@ -203,7 +203,7 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
   		Console.Beep();
   
 		// touch plate thickness / height Correction
-	    exec.Code("G92 Z" + Dbl2Str(TouchPlateHeight); 
+	    exec.Code("G92 Z" + Dbl2Str(TouchPlateHeight)); 
 
 		// now retract Z, if probing X or Y then only retract to XYProbeHeight .  Otherwise the end of this code will bring it back to the final SafeZ height
 		if (ProbeX || ProbeY) {
@@ -221,7 +221,7 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 		}
 
 		// Lower Z axis to X and Y probe height
-		exec.Code(G0String + " Z" + Dbl2Str(XYProbeHeight); 
+		exec.Code(G0String + " Z" + Dbl2Str(XYProbeHeight)); 
   		while(exec.IsMoving()){}
   		exec.Wait(100);
 		
@@ -247,7 +247,8 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 		exec.Code("G92 X" + Dbl2Str(TempDouble)); 
 		
 		// Safe X retract
-		TempDouble = ((TouchPlateWidth/2) - (ToolDiameter/2)) * XProbeDirection;
+// TempDouble = ((TouchPlateWidth/2) - ToolDiameter/2) * XProbeDirection;
+		TempDouble = TouchPlateWidth/2 * XProbeDirection;
   		exec.Code(G0String + " X" + Dbl2Str(TempDouble)); 
   		while(exec.IsMoving()){}
   		exec.Wait(100);
@@ -289,7 +290,9 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 		exec.Code("G92 Y" + Dbl2Str(TempDouble)); 
 		
 		// Safe Y retract
-		TempDouble = ((TouchPlateWidth/2) - (ToolDiameter/2)) * YProbeDirection;
+//		TempDouble = ((TouchPlateWidth/2) - (ToolDiameter/2)) * YProbeDirection;
+		TempDouble = TouchPlateWidth/2 * YProbeDirection;
+
   		exec.Code(G0String + " Y" + Dbl2Str(TempDouble)); 
   		while(exec.IsMoving()){}
   		exec.Wait(100);
