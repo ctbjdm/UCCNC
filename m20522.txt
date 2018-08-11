@@ -197,17 +197,17 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 	// check if user wants to Probe Z axis, and if so do it
 	if (ProbeZ) {
 		TempDouble = (ZProbeDistance*-1); // reverse probe direction, so we're probing in the right way
-		exec.Code("G31 Z" + TempDouble + " F" + ProbeFeedRate); 
+		exec.Code("G31 Z" + Dbl2Str(TempDouble) + " F" + ProbeFeedRate); 
 		while(exec.IsMoving()){}
   		exec.Wait(100);
   		Console.Beep();
   
 		// touch plate thickness / height Correction
-	    exec.Code("G92 Z" + TouchPlateHeight); 
+	    exec.Code("G92 Z" + Dbl2Str(TouchPlateHeight)); 
 
 		// now retract Z, if probing X or Y then only retract to XYProbeHeight .  Otherwise the end of this code will bring it back to the final SafeZ height
 		if (ProbeX || ProbeY) {
-			exec.Code(G0String + " Z" + XYProbeHeight); 
+			exec.Code(G0String + " Z" + Dbl2Str(XYProbeHeight)); 
 		}
 		
   		while(exec.IsMoving()){}
@@ -221,7 +221,7 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 		}
 
 		// Lower Z axis to X and Y probe height
-		exec.Code(G0String + " Z" + XYProbeHeight); 
+		exec.Code(G0String + " Z" + Dbl2Str(XYProbeHeight)); 
   		while(exec.IsMoving()){}
   		exec.Wait(100);
 		
@@ -233,7 +233,7 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 		}
 		
 		TempDouble = (XMachineCoord + (XProbeDistance * XProbeDirection));
-  		exec.Code("G31 X" + TempDouble + " F" + ProbeFeedRate); // Do the X probing with Probe Feedrate.  JDM added the * XProbeDirection to enable touchplate locations
+  		exec.Code("G31 X" + Dbl2Str(TempDouble) + " F" + ProbeFeedRate); // Do the X probing with Probe Feedrate.  JDM added the * XProbeDirection to enable touchplate locations
   		while(exec.IsMoving()){}
   		exec.Wait(100);
   		Console.Beep();
@@ -244,11 +244,12 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 		
 		// Zero the X-axis
 		TempDouble = ((TouchPlateWidth - (ToolDiameter/2)) * XProbeDirection);
-		exec.Code("G92 X" + TempDouble); 
+		exec.Code("G92 X" + Dbl2Str(TempDouble)); 
 		
 		// Safe X retract
-		TempDouble = ((TouchPlateWidth/2) - (ToolDiameter/2)) * XProbeDirection;
-  		exec.Code(G0String + " X" + TempDouble); 
+// TempDouble = ((TouchPlateWidth/2) - ToolDiameter/2) * XProbeDirection;
+		TempDouble = TouchPlateWidth/2 * XProbeDirection;
+  		exec.Code(G0String + " X" + Dbl2Str(TempDouble)); 
   		while(exec.IsMoving()){}
   		exec.Wait(100);
 
@@ -275,7 +276,7 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 		
 		// Do the Y probing with Probe Feedrate.
 		TempDouble = (YMachineCoord + (YProbeDistance * YProbeDirection));
-  		exec.Code("G31 Y" + TempDouble + " F" + ProbeFeedRate); 
+  		exec.Code("G31 Y" + Dbl2Str(TempDouble) + " F" + ProbeFeedRate); 
   		while(exec.IsMoving()){}
   		exec.Wait(100);
   		Console.Beep();
@@ -286,11 +287,13 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 		
 		// Zero the Y-axis
 		TempDouble = ((TouchPlateWidth - (ToolDiameter/2)) * YProbeDirection);
-		exec.Code("G92 Y" + TempDouble); 
+		exec.Code("G92 Y" + Dbl2Str(TempDouble)); 
 		
 		// Safe Y retract
-		TempDouble = ((TouchPlateWidth/2) - (ToolDiameter/2)) * YProbeDirection;
-  		exec.Code(G0String + " Y" + TempDouble); 
+//		TempDouble = ((TouchPlateWidth/2) - (ToolDiameter/2)) * YProbeDirection;
+		TempDouble = TouchPlateWidth/2 * YProbeDirection;
+
+  		exec.Code(G0String + " Y" + Dbl2Str(TempDouble)); 
   		while(exec.IsMoving()){}
   		exec.Wait(100);
 
@@ -299,12 +302,17 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 	
 	// retract Z to SafeZ height plus the TouchPlateHeight
 	TempDouble = (SafeZ + TouchPlateHeight);
-	exec.Code(G0String + " Z" + TempDouble);
+	exec.Code(G0String + " Z" + Dbl2Str(TempDouble));
 	while(exec.IsMoving()){}
 	exec.Wait(100); 
 	
 	Console.Beep();
 	Console.Beep();
 
-
+#Events
+string Dbl2Str (double val)
+{
+return String.Format("{0:F6}", val);
+}
+	
 
