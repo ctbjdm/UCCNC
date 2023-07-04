@@ -6,6 +6,7 @@
 
 
 // Version history
+// 1.02 - added slow z probing for more accuracy and always probe Z axis 
 // 1.01 - lots of cleanup, variable names, comments, etc.  Improved messaging
 // 1.00 - tested successfully using all four probe locations
 
@@ -26,12 +27,15 @@ bool PauseProbe = true;									// Pause probing between probing X and Y axis to
 	
 bool BitDiameterInInches = true;						//  Ask the user for bit diameter in inches.  Is there a better way to handle metric vs imperial?
 	
-double ProbeFeedRate = 100; 							// feedrate that all probing is done.  
+double ProbeFeedRate = 100; 							// feedrate that probing is done for X, Y, and initial Z
+double ProbeSlowFeedRate = 10; 							// feedrate that probing is done to get a more accurate reading for Z
+
 double TouchPlateHeight = 25.4;							// CNC RouterParts Touchplate is 1" high
 double TouchPlateWidth = (2.205 * 25.4); 				// Width of CNC RouterParts Touchplate is 2.205" (56mm) wide
 double XProbeDistance = 2 * 25.4;						// How far to probe X Axis looking for the edge
 double YProbeDistance = 2 * 25.4;						// How far to probe Y Axis looking for the edge
-double ZProbeDistance = 1.5 * 25.4;						// How far to probe Z Axis looking for the edge
+double ZProbeDistance = 1.5 * 25.4;
+double ZSlowProbeDistance = 0.03* 25.4;						// How far to probe Z Axis when using slow probing for more accuracy 
 double SafeZ = 20; 										// enter your Safe Z distance.  After probing it lifts up probe height + this value
 double XYProbeHeight = TouchPlateHeight+(.125*25.4); 	// How high to lift tool while probing X and Y.  I'm using the TouchPlateHeight + 1/8" (converted to mm)
 
@@ -60,17 +64,20 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 
 
 
+	if (DebugMode) {
+		MessageBox.Show (exec.mainform, "Starting", "DEBUG", MessageBoxButtons.OK, MessageBoxIcon.Information);
+	}
+
 	//  During debugging using G01 instead of G00 to slow things down for testing
 	if (DebugMode) {
 		G0String = "G01";
+		MessageBox.Show (exec.mainform, "In DEBUG mode - will replace G00 with G01 - so movement commands will be slower!", "DEBUG", MessageBoxButtons.OK, MessageBoxIcon.Information);
 	}
 	else {
 		G0String = "G00";
 	}
 
-	if (DebugMode) {
-		MessageBox.Show (exec.mainform, "Starting", "DEBUG", MessageBoxButtons.OK, MessageBoxIcon.Information);
-	}
+
 // do some checks
 
 	if (! XHomeState || ! YHomeState)
@@ -99,7 +106,7 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 		}
 
 	// select axes to auto zero
-	ResultText = exec.TextQuestion("Which Axes to auto zero?  Enter X|Y|Z or multiple i.e. XY").ToUpper();
+	ResultText = exec.TextQuestion("Which Axes to auto zero?  Enter X|Y or multiple i.e. XY - will always probe Z").ToUpper();
 	
 	if (ResultText.Contains("X")) {
 		ProbeX = true;
@@ -115,12 +122,8 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 		ProbeY = false;
 	}
 
-	if (ResultText.Contains("Z")) {
-		ProbeZ = true;
-	}
-	else {
-		ProbeZ = false;
-	}
+		ProbeZ = true; // always probe Z to be safe
+
 
 	if (DebugMode) {
 		MessageBox.Show (exec.mainform, "ProbeX: " + ProbeX + " ProbeY: " + ProbeY + " ProbeZ: " + ProbeZ, "DEBUG - Probe Values", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -133,11 +136,9 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 		return; 
 	}
 
-	// only ask the user about tthe tool diameter and where the probe is if they are probing X or Y-Axis
+	// only ask the user about the tool diameter and where the probe is if they are probing X or Y-Axis
 	if (ProbeX || ProbeY) {
 		
-		// since probing X or Y, need the tool diameter so ask the user for the bit diameter (not needed if only probing Z)
-
 		// check for Imperial or metric for the bit diameter, as set by the BitDiameterInInches boolean at the top and handle the conversion if necessary
 		if (BitDiameterInInches) {
 			ToolDiameter = exec.Question("Enter tool diameter in inches");
@@ -150,7 +151,9 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 		
 		// Identify where the probe is
 		// 0=Left/Front 1=Left/Rear 2=Right/Front 3=Right/Rear
+
 		WCSOrigin = exec.Question("Where is the probe? 0=Left/Front 1=Left/Rear 2=Right/Front 3=Right/Rear?  Default is 0");
+
 		if ((WCSOrigin < 0) || (WCSOrigin > 3)) {
 			// error - convert to try/catch?
 			MessageBox.Show (exec.mainform, "Must choose a valid location for the probe.  Aborting", "Choose a valid probe location", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -194,15 +197,56 @@ double TempDouble = 0;									// temporary variable to do math outside of GCode
 		}
 	}
 
-	// check if user wants to Probe Z axis, and if so do it
+	// NOTE: always probing Z...
 	if (ProbeZ) {
+	
+	// do initial probe for finding Z zero at 'regular' speed
+
 		TempDouble = (ZProbeDistance*-1); // reverse probe direction, so we're probing in the right way
 		exec.Code("G31 Z" + Dbl2Str(TempDouble) + " F" + ProbeFeedRate); 
 		while(exec.IsMoving()){}
   		exec.Wait(100);
+
+	if (DebugMode) {
+		MessageBox.Show (exec.mainform, "Setting Z zero next step", "DEBUG", MessageBoxButtons.OK, MessageBoxIcon.Information);
+	}
+	
+	// touch plate thickness / height Correction - set Z zero rough height to the height of the touch plate
+	    exec.Code("G92 Z" + Dbl2Str(TouchPlateHeight)); 
+
+	if (DebugMode) {
+		MessageBox.Show (exec.mainform, "Z zero should be set to touchplate height", "DEBUG", MessageBoxButtons.OK, MessageBoxIcon.Information);
+	}
+
+	if (DebugMode) {
+		MessageBox.Show (exec.mainform, "Now retract a little for slow Z probing", "DEBUG", MessageBoxButtons.OK, MessageBoxIcon.Information);
+	}
+
+	// retract to ZSlowProbeDistance height above the TouchPlateHeight to do more accurate slow probing
+
+		TempDouble = (ZSlowProbeDistance+TouchPlateHeight); 
+		exec.Code ("G00 Z" + Dbl2Str(TempDouble)); 
+		while(exec.IsMoving()){}
+		exec.Wait(100);
+
+	if (DebugMode) {
+		MessageBox.Show (exec.mainform, "Z has retracted for fine probing", "DEBUG", MessageBoxButtons.OK, MessageBoxIcon.Information);
+	}
+
+
+	if (DebugMode) {
+		MessageBox.Show (exec.mainform, "Now starting fine probing", "DEBUG", MessageBoxButtons.OK, MessageBoxIcon.Information);
+	}
+
+	// now find zero at slow speed for more accuracy ZSlowProbeDistance
+	
+		TempDouble = (ZSlowProbeDistance*-1); // reverse probe direction, so we're probing in the right way
+		exec.Code("G31 Z" + Dbl2Str(TempDouble) + " F" + ProbeSlowFeedRate); 		
+		while(exec.IsMoving()){}
+		exec.Wait(100);
   		Console.Beep();
   
-		// touch plate thickness / height Correction
+		// touch plate thickness / height Correction - set z zero fine 
 	    exec.Code("G92 Z" + Dbl2Str(TouchPlateHeight)); 
 
 		// now retract Z, if probing X or Y then only retract to XYProbeHeight .  Otherwise the end of this code will bring it back to the final SafeZ height
